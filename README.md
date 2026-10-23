@@ -39,6 +39,8 @@ Passwords use salted scrypt. Sessions and invitation/recovery tokens are stored 
 
 State-changing HTTP requests must send an Origin matching FRONTEND_URL. Production should use a single HTTPS frontend/API origin. Rate limits and helmet headers are enabled. No payment credentials are needed for the manual invoice model.
 
+Private voice messages: POST `workspaces/:workspaceId/conversations/:id/voice` with JSON `{audio: base64, mime, duration, waveform}`. Accepted containers are WebM, Ogg, MP4 and WAV, checked by signature; this is not full audio decoding. Limit 2 MB decoded bytes and 3 MB JSON, 180 seconds of declared duration, 1–64 normalized waveform peaks. The browser recorder enforces its duration timer. Workspace audio quotas: Pilot 50 MB, Starter 256 MB, Growth 1024 MB. Bytes live in SQLite `voice_messages`, included in normal database backups. Message lists return duration/waveform metadata; GET `workspaces/:workspaceId/conversations/:id/messages/:messageId/audio` requires active membership and participation and supports single byte ranges. Both participants can play sent recordings; suspended conversations are read-only. Reverse proxies must permit 3 MB requests and `media-src 'self' blob:` for local previews.
+
 ## Operator commands
 
 ```sh

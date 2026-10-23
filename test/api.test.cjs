@@ -328,6 +328,91 @@ test("Gather API: real multi-user workflows and authorization boundaries", async
       },
     );
     await t.test(
+      "voice messages persist bytes, support seeking and remain private",
+      async () => {
+        const wav = Buffer.alloc(64044);
+        wav.write("RIFF");
+        wav.writeUInt32LE(wav.length - 8, 4);
+        wav.write("WAVEfmt ", 8);
+        wav.writeUInt32LE(16, 16);
+        wav.writeUInt16LE(1, 20);
+        wav.writeUInt16LE(1, 22);
+        wav.writeUInt32LE(8000, 24);
+        wav.writeUInt32LE(16000, 28);
+        wav.writeUInt16LE(2, 32);
+        wav.writeUInt16LE(16, 34);
+        wav.write("data", 36);
+        wav.writeUInt32LE(64000, 40);
+        const path = `workspaces/${ws}/conversations/${conversation}`;
+        const draft = {
+          audio: wav.toString("base64"),
+          mime: "audio/wav",
+          duration: 1,
+          waveform: [0.1, 0.3, 0.5, 0.2],
+        };
+        const sent = await owner.ok(path + "/voice", "POST", draft);
+        const received = (await member.ok(path + "/messages")).items.find(
+          (m) => m.id === sent.id,
+        );
+        assert.equal(received.duration, 1);
+        assert.deepEqual(received.waveform, draft.waveform);
+        assert.equal(received.audio, undefined);
+        const url = base + "/api/" + path + `/messages/${sent.id}/audio`;
+        const audio = await fetch(url, { headers: { Cookie: member.cookie } });
+        assert.equal(audio.status, 200);
+        assert.equal(audio.headers.get("content-type"), "audio/wav");
+        assert.deepEqual(Buffer.from(await audio.arrayBuffer()), wav);
+        const range = await fetch(url, {
+          headers: { Cookie: member.cookie, Range: "bytes=44-99" },
+        });
+        assert.equal(range.status, 206);
+        assert.equal((await range.arrayBuffer()).byteLength, 56);
+        assert.equal(
+          (await fetch(url, { headers: { Cookie: outsider.cookie } })).status,
+          404,
+        );
+        assert.equal((await fetch(url)).status, 401);
+        assert.equal(
+          (
+            await owner.call(path + "/voice", "POST", {
+              ...draft,
+              audio: Buffer.from("not audio at all").toString("base64"),
+            })
+          ).status,
+          400,
+        );
+        assert.equal(
+          (
+            await owner.call(path + "/voice", "POST", {
+              ...draft,
+              duration: 181,
+            })
+          ).status,
+          400,
+        );
+        assert.equal(
+          (
+            await owner.call(path + "/voice", "POST", {
+              ...draft,
+              waveform: [2],
+            })
+          ).status,
+          400,
+        );
+        const huge = Buffer.alloc(2 * 1024 * 1024 + 1);
+        wav.copy(huge);
+        assert.equal(
+          (
+            await owner.call(path + "/voice", "POST", {
+              ...draft,
+              audio: huge.toString("base64"),
+            })
+          ).status,
+          400,
+        );
+      },
+    );
+    await t.test(
       "moderators can hide and restore content, and hidden posts leave the saved feed",
       async () => {
         await member.ok(`workspaces/${ws}/posts/${postId}/report`, "POST", {
