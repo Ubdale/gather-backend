@@ -1,7 +1,8 @@
 require("reflect-metadata");
 const { Database } = require("../dist/database");
-const { backup } = require("node:sqlite");
 const { resolve } = require("node:path");
+const { writeFile } = require("node:fs/promises");
+const { tables } = require("./data-tables.cjs");
 async function main() {
   if (!process.argv[2])
     throw Error(
@@ -9,12 +10,26 @@ async function main() {
     );
   const db = new Database();
   try {
-    await backup(db.connection, resolve(process.argv[2]));
+    const data = await db.transaction(async () => {
+      const data = {};
+      for (const table of tables)
+        data[table] = await db.all(`SELECT * FROM ${table}`);
+      return data;
+    }, true);
+    await writeFile(
+      resolve(process.argv[2]),
+      JSON.stringify({
+        format: "gather-postgresql-v1",
+        created: new Date().toISOString(),
+        tables: data,
+      }),
+      { flag: "wx", mode: 0o600 },
+    );
     console.log(
-      "Consistent SQLite backup completed. Treat it as private customer data.",
+      "Consistent PostgreSQL snapshot completed, including voice bytes. Treat it as private customer data.",
     );
   } finally {
-    db.onModuleDestroy();
+    await db.onModuleDestroy();
   }
 }
 main().catch((error) => {

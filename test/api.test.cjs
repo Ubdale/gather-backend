@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 process.env.NODE_ENV = "test";
-process.env.DATABASE_PATH = ":memory:";
+require("./test-database.cjs")("api");
 process.env.FRONTEND_URL = "http://127.0.0.1:4200";
 const { createApp } = require("../dist/main");
 
@@ -752,39 +752,27 @@ test("Gather API: real multi-user workflows and authorization boundaries", async
   }
 });
 
-test("SQLite data survives a database close and reopen", () => {
+test("PostgreSQL data survives a pool close and reopen", async () => {
   const { Database } = require("../dist/database");
-  const { mkdtempSync, rmSync } = require("node:fs");
-  const { tmpdir } = require("node:os");
-  const { join, resolve } = require("node:path");
-  const folder = mkdtempSync(join(tmpdir(), "gather-persistence-test-"));
-  const previous = process.env.DATABASE_PATH;
-  process.env.DATABASE_PATH = join(folder, "test.sqlite");
-  try {
+  {
     const first = new Database();
-    first.run(
+    await first.run(
       "INSERT INTO users(name,email,password) VALUES(?,?,?)",
       "Persisted",
       "persist@example.test",
       "a-hashed-test-value",
     );
-    first.onModuleDestroy();
+    await first.onModuleDestroy();
     const second = new Database();
     assert.equal(
-      second.get("SELECT name FROM users WHERE email=?", "persist@example.test")
-        .name,
+      (
+        await second.get(
+          "SELECT name FROM users WHERE email=?",
+          "persist@example.test",
+        )
+      ).name,
       "Persisted",
     );
-    second.onModuleDestroy();
-  } finally {
-    process.env.DATABASE_PATH = previous;
-    if (
-      !resolve(folder).startsWith(
-        resolve(tmpdir()) + require("node:path").sep,
-      ) ||
-      !folder.includes("gather-persistence-test-")
-    )
-      throw Error("Unsafe test cleanup path");
-    rmSync(folder, { recursive: true, force: true });
+    await second.onModuleDestroy();
   }
 });

@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { Module, Controller, Get } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
+import { APP_INTERCEPTOR, NestFactory } from "@nestjs/core";
+import { WriteTransactionInterceptor } from "./write-transaction";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -35,7 +36,12 @@ class PublicController {
     WorkspacesController,
     CommunityController,
   ],
-  providers: [Database, SessionGuard, WorkspaceGuard],
+  providers: [
+    Database,
+    SessionGuard,
+    WorkspaceGuard,
+    { provide: APP_INTERCEPTOR, useClass: WriteTransactionInterceptor },
+  ],
 })
 export class AppModule {}
 
