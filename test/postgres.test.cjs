@@ -3,6 +3,12 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 require("./test-database.cjs")("postgres");
 const { Database } = require("../dist/database");
+const { parse, idSchema } = require("../dist/security");
+test("invalid PostgreSQL identifiers fail validation before reaching SQL", () => {
+  for (const value of ["9007199254740991", "0", "-1", "not-an-id"])
+    assert.throws(() => parse(idSchema, value));
+  assert.equal(parse(idSchema, "2147483647"), 2147483647);
+});
 test("PostgreSQL parameter binding and transaction rollback preserve isolation", async () => {
   const db = new Database();
   try {

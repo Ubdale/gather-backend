@@ -44,7 +44,7 @@ export function parse<S extends z.ZodTypeAny>(
   return result.data;
 }
 export const passwordSchema = z.string().min(10).max(128);
-export const idSchema = z.coerce.number().int().positive();
+export const idSchema = z.coerce.number().int().positive().max(2147483647);
 export const text = (max: number) => z.string().trim().min(1).max(max);
 export const cookieName = "gather_session";
 export function sessionToken(request: any): string {

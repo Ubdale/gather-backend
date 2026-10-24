@@ -368,6 +368,26 @@ test("Gather API: real multi-user workflows and authorization boundaries", async
         assert.equal(range.status, 206);
         assert.equal((await range.arrayBuffer()).byteLength, 56);
         assert.equal(
+          (
+            await fetch(url, {
+              headers: { Cookie: member.cookie, Range: "bytes=999999-" },
+            })
+          ).status,
+          416,
+        );
+        assert.equal(
+          (
+            await fetch(url, {
+              headers: { Cookie: member.cookie, Range: "bytes=2-1" },
+            })
+          ).status,
+          416,
+        );
+        assert.equal(
+          (await owner.call(path + "/messages?before=9007199254740991")).status,
+          400,
+        );
+        assert.equal(
           (await fetch(url, { headers: { Cookie: outsider.cookie } })).status,
           404,
         );
